@@ -66,6 +66,7 @@ impl Actor for Counter {
         let (send, mut recv) = oneshot::channel::<()>();
 
         let prev: JoinHandle<Result<()>> = spawn_blocking(move || {
+            // Simulate CPU-bound work
             for _ in 0..10 {
                 std::thread::sleep(Duration::from_secs(1));
                 if let Ok(()) = recv.try_recv() {
