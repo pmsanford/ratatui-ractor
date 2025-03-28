@@ -2,6 +2,7 @@
 use std::{
     io::{self, Stdout},
     sync::Arc,
+    time::Duration,
 };
 
 use anyhow::Result;
@@ -17,12 +18,18 @@ use ratatui::{
     text::{Line, Text},
     widgets::{Block, Paragraph, Widget},
 };
-use tokio::sync::Mutex;
+use tokio::{
+    sync::{
+        Mutex,
+        oneshot::{self, Sender},
+    },
+    task::{JoinHandle, spawn_blocking},
+};
 
 #[tokio::main]
 async fn main() -> Result<()> {
     let (nb, _guard) =
-        tracing_appender::non_blocking(tracing_appender::rolling::minutely("./", "tui"));
+        tracing_appender::non_blocking(tracing_appender::rolling::daily("./", "tui"));
     tracing_subscriber::fmt().with_writer(nb).init();
     let terminal = ratatui::init();
     let (app, app_handle) =
@@ -61,10 +68,15 @@ enum CounterMessage {
     IncrementCounter(u8),
 }
 
+#[derive(Default, Debug)]
+struct CounterState {
+    prev: Option<BlockTask>,
+}
+
 impl Actor for Counter {
     type Msg = CounterMessage;
 
-    type State = ();
+    type State = CounterState;
 
     type Arguments = ();
 
@@ -73,25 +85,60 @@ impl Actor for Counter {
         _myself: ractor::ActorRef<Self::Msg>,
         _args: Self::Arguments,
     ) -> Result<Self::State, ractor::ActorProcessingErr> {
-        Ok(())
+        Ok(CounterState::default())
     }
 
     async fn handle(
         &self,
         _myself: ractor::ActorRef<Self::Msg>,
         message: Self::Msg,
-        _state: &mut Self::State,
+        state: &mut Self::State,
     ) -> std::result::Result<(), ractor::ActorProcessingErr> {
+        if let Some(BlockTask { canceller, handle }) = state.prev.take() {
+            tracing::info!("Handling previous task");
+            if !handle.is_finished() {
+                tracing::info!("Not yet finished; cancelling");
+                canceller.send(()).unwrap();
+            }
+            tracing::info!("Awaiting task");
+            handle.await??;
+        }
+        tracing::info!("Incrementing counter");
         let CounterMessage::IncrementCounter(cur) = message;
 
         let app: ActorRef<AppMessage> = ractor::registry::where_is("app".to_string())
             .expect("App??")
             .into();
 
-        cast!(app, AppMessage::UpdateCount(cur + 1))?;
+        let (send, mut recv) = oneshot::channel::<()>();
+
+        let prev: JoinHandle<Result<()>> = spawn_blocking(move || {
+            for _ in 0..10 {
+                std::thread::sleep(Duration::from_secs(1));
+                if let Ok(()) = recv.try_recv() {
+                    tracing::info!("Got cancellation token");
+                    return Ok(());
+                }
+            }
+            tracing::info!("Finished waiting");
+            cast!(app, AppMessage::UpdateCount(cur + 1))?;
+
+            Ok(())
+        });
+
+        state.prev = Some(BlockTask {
+            canceller: send,
+            handle: prev,
+        });
 
         Ok(())
     }
+}
+
+#[derive(Debug)]
+struct BlockTask {
+    canceller: Sender<()>,
+    handle: JoinHandle<Result<()>>,
 }
 
 struct App;
