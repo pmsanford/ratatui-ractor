@@ -133,6 +133,21 @@ impl Actor for Counter {
 
         Ok(())
     }
+
+    async fn post_stop(
+        &self,
+        _myself: ActorRef<Self::Msg>,
+        state: &mut Self::State,
+    ) -> std::result::Result<(), ractor::ActorProcessingErr> {
+        if let Some(BlockTask { canceller, handle }) = state.prev.take() {
+            if !handle.is_finished() {
+                canceller.send(()).unwrap();
+            }
+            handle.await??;
+        }
+
+        Ok(())
+    }
 }
 
 #[derive(Debug)]
