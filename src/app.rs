@@ -27,7 +27,7 @@ pub enum AppMessage {
     Draw,
     UpdateCount(u8),
     HandleKey(KeyEvent),
-    Exit(RpcReplyPort<bool>),
+    ShouldExit(RpcReplyPort<bool>),
 }
 
 impl Actor for App {
@@ -69,7 +69,7 @@ impl Actor for App {
                 cast!(myself, AppMessage::Draw)?;
                 tracing::info!("Assigned counter update: {}", new);
             }
-            AppMessage::Exit(reply) => {
+            AppMessage::ShouldExit(reply) => {
                 tracing::info!("Got exit check");
                 reply.send(state.exit)?;
                 tracing::info!("Replied to exit check");

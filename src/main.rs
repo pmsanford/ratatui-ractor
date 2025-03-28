@@ -19,7 +19,7 @@ async fn main() -> Result<()> {
 
     let (counter, counter_handle) = Actor::spawn(Some("counter".to_string()), Counter, ()).await?;
 
-    while !call!(app, AppMessage::Exit)? {
+    while !call!(app, AppMessage::ShouldExit)? {
         cast!(app, AppMessage::Draw)?;
         match event::read()? {
             // it's important to check that the event is a key press event as
