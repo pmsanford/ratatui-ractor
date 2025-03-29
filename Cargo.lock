@@ -613,6 +613,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "ratatui-ractor"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "crossterm",
+ "ractor",
+ "ratatui",
+ "tokio",
+ "tracing",
+ "tracing-appender",
+ "tracing-subscriber",
+]
+
+[[package]]
 name = "redox_syscall"
 version = "0.5.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -928,20 +942,6 @@ dependencies = [
  "thread_local",
  "tracing-core",
  "tracing-log",
-]
-
-[[package]]
-name = "tuiractor"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "crossterm",
- "ractor",
- "ratatui",
- "tokio",
- "tracing",
- "tracing-appender",
- "tracing-subscriber",
 ]
 
 [[package]]
